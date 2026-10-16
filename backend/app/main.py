@@ -4,6 +4,7 @@ import uuid
 from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
+from app.api import agents
 from app.config import settings
 from app.logging import setup_logging
 
@@ -18,6 +19,7 @@ REQUESTS = Counter("sre_http_requests_total", "HTTP requests", ["path", "method"
 @app.middleware("http")
 async def correlation_and_metrics(request: Request, call_next) -> Response:
     correlation_id = request.headers.get("x-correlation-id") or str(uuid.uuid4())
+    request.state.correlation_id = correlation_id
     response = await call_next(request)
     response.headers["x-correlation-id"] = correlation_id
     REQUESTS.labels(request.url.path, request.method, response.status_code).inc()
@@ -36,3 +38,6 @@ def healthz() -> dict:
 @app.get("/metrics")
 def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+app.include_router(agents.router)
