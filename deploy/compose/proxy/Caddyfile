@@ -1,0 +1,14 @@
+# TLS reverse proxy stub — see README.md in this directory.
+# Replace sre.internal.example with the real internal hostname.
+
+sre.internal.example {
+	handle /v1/* {
+		reverse_proxy api:8000
+	}
+	handle /healthz {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy web:80
+	}
+}
