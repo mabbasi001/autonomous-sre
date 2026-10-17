@@ -15,6 +15,8 @@ type Config struct {
 	ControlPlaneURL string
 	// Environment this agent belongs to (development/staging/production).
 	Environment string
+	// StateDir holds the agent's credentials and local state.
+	StateDir string
 }
 
 // Defaults returns a Config with safe defaults.
@@ -22,6 +24,7 @@ func Defaults() Config {
 	return Config{
 		ControlPlaneURL: "https://localhost:8000",
 		Environment:     "development",
+		StateDir:        "/var/lib/autonomous-sre",
 	}
 }
 
@@ -56,6 +59,8 @@ func Load(path string) (Config, error) {
 			cfg.ControlPlaneURL = value
 		case "environment":
 			cfg.Environment = value
+		case "state_dir":
+			cfg.StateDir = value
 		default:
 			// unknown keys are errors: config typos must not pass silently
 			return cfg, fmt.Errorf("unknown config key: %q", key)
