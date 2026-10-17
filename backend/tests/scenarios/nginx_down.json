@@ -1,0 +1,33 @@
+[
+  {
+    "path": "/v1/events",
+    "items": [
+      {
+        "type": "systemd.service",
+        "payload": {"unit": "nginx", "active_state": "inactive", "sub_state": "dead", "restarts": 0}
+      }
+    ]
+  },
+  {
+    "path": "/v1/events",
+    "items": [
+      {
+        "type": "http.check",
+        "payload": {"name": "web", "url": "http://localhost/healthz", "ok": false, "status_code": 0, "latency_ms": 5000}
+      }
+    ]
+  },
+  {
+    "path": "/v1/telemetry/logs",
+    "items": [
+      {
+        "unit": "nginx",
+        "lines": [
+          "nginx[1312]: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)",
+          "systemd[1]: nginx.service: Main process exited, code=exited, status=1/FAILURE",
+          "systemd[1]: nginx.service: Failed with result 'exit-code'."
+        ]
+      }
+    ]
+  }
+]

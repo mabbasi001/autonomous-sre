@@ -23,12 +23,15 @@ def token_hash(token: str) -> str:
 
 async def authenticated_agent(
     request: Request,
-    x_agent_id: str = Header(),
-    x_timestamp: str = Header(),
-    x_signature: str = Header(),
+    x_agent_id: str | None = Header(None),
+    x_timestamp: str | None = Header(None),
+    x_signature: str | None = Header(None),
     db: Session = Depends(get_db),
 ) -> Agent:
     unauthorized = HTTPException(status_code=401, detail="invalid agent credentials")
+
+    if not (x_agent_id and x_timestamp and x_signature):
+        raise unauthorized
 
     try:
         agent_id = uuid.UUID(x_agent_id)

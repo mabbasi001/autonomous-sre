@@ -1,14 +1,15 @@
 import argparse
+import json
 import secrets
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.audit import record
 from app.db import SessionLocal
-from app.models import Agent, EnrollmentToken, Environment
+from app.models import Agent, AgentConfig, EnrollmentToken, Environment
 from app.security import token_hash
 
 
@@ -55,6 +56,30 @@ def revoke_agent(agent_id: str) -> None:
     print(f"revoked agent {agent_id}")
 
 
+def set_agent_config(agent_id: str, config_path: str) -> None:
+    with open(config_path) as f:
+        config = json.load(f)
+    with SessionLocal() as db:
+        agent = db.get(Agent, uuid.UUID(agent_id))
+        if agent is None:
+            sys.exit(f"unknown agent: {agent_id}")
+        current = db.scalar(
+            select(func.max(AgentConfig.version)).where(AgentConfig.agent_id == agent.id)
+        )
+        version = (current or 0) + 1
+        db.add(AgentConfig(agent_id=agent.id, version=version, config=config))
+        record(
+            db,
+            actor_type="user",
+            event_type="agent_config.updated",
+            entity_type="agent",
+            entity_id=agent_id,
+            detail={"version": version},
+        )
+        db.commit()
+    print(f"agent {agent_id} config version {version}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="sre-admin")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -66,11 +91,17 @@ def main() -> None:
     p_revoke = sub.add_parser("revoke-agent")
     p_revoke.add_argument("agent_id")
 
+    p_config = sub.add_parser("set-agent-config")
+    p_config.add_argument("agent_id")
+    p_config.add_argument("--file", required=True)
+
     args = parser.parse_args()
     if args.command == "create-enrollment-token":
         create_enrollment_token(args.environment, args.ttl_minutes)
     elif args.command == "revoke-agent":
         revoke_agent(args.agent_id)
+    elif args.command == "set-agent-config":
+        set_agent_config(args.agent_id, args.file)
 
 
 if __name__ == "__main__":

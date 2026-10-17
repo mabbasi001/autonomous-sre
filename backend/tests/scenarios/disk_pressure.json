@@ -1,0 +1,5 @@
+[
+  {"path": "/v1/telemetry/metrics", "items": [{"name": "host.disk_used_percent", "value": 91.5, "labels": {"mount": "/"}}]},
+  {"path": "/v1/telemetry/metrics", "items": [{"name": "host.disk_used_percent", "value": 93.2, "labels": {"mount": "/"}}]},
+  {"path": "/v1/telemetry/metrics", "items": [{"name": "host.disk_used_percent", "value": 95.8, "labels": {"mount": "/"}}]}
+]

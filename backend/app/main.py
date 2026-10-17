@@ -2,11 +2,14 @@ import logging
 import uuid
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
-from app.api import agents
+from app.api import agents, ingestion
 from app.config import settings
 from app.logging import setup_logging
+
+MAX_BODY_BYTES = 1_000_000
 
 setup_logging(settings.log_level)
 logger = logging.getLogger("api")
@@ -20,7 +23,11 @@ REQUESTS = Counter("sre_http_requests_total", "HTTP requests", ["path", "method"
 async def correlation_and_metrics(request: Request, call_next) -> Response:
     correlation_id = request.headers.get("x-correlation-id") or str(uuid.uuid4())
     request.state.correlation_id = correlation_id
-    response = await call_next(request)
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_BYTES:
+        response: Response = JSONResponse(status_code=413, content={"detail": "payload too large"})
+    else:
+        response = await call_next(request)
     response.headers["x-correlation-id"] = correlation_id
     REQUESTS.labels(request.url.path, request.method, response.status_code).inc()
     logger.info(
@@ -41,3 +48,4 @@ def metrics() -> Response:
 
 
 app.include_router(agents.router)
+app.include_router(ingestion.router)
