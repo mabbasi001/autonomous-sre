@@ -4,6 +4,7 @@ package config
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -26,6 +27,36 @@ func Defaults() Config {
 		Environment:     "development",
 		StateDir:        "/var/lib/autonomous-sre",
 	}
+}
+
+// Remote is the centrally managed collection config fetched from the
+// control plane. Collection is allowlist-only: anything not listed here
+// is not collected.
+type Remote struct {
+	CollectIntervalSeconds int               `json:"collect_interval_seconds"`
+	Services               []string          `json:"services"`
+	HTTPChecks             []HTTPCheckConfig `json:"http_checks"`
+	LogUnits               []LogUnitConfig   `json:"log_units"`
+}
+
+type HTTPCheckConfig struct {
+	Name           string `json:"name"`
+	URL            string `json:"url"`
+	TimeoutSeconds int    `json:"timeout_seconds"`
+}
+
+type LogUnitConfig struct {
+	Unit     string `json:"unit"`
+	MaxLines int    `json:"max_lines"`
+}
+
+func ParseRemote(data []byte) (Remote, error) {
+	remote := Remote{CollectIntervalSeconds: 60}
+	err := json.Unmarshal(data, &remote)
+	if remote.CollectIntervalSeconds <= 0 {
+		remote.CollectIntervalSeconds = 60
+	}
+	return remote, err
 }
 
 // Load reads a config file of simple "key: value" lines. A missing file
