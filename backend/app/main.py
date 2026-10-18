@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
-from app.api import agents, ingestion
+from app.api import agents, alert_rules, ingestion
 from app.config import settings
 from app.logging import setup_logging
 
@@ -49,3 +49,4 @@ def metrics() -> Response:
 
 app.include_router(agents.router)
 app.include_router(ingestion.router)
+app.include_router(alert_rules.router)
