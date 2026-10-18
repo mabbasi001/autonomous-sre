@@ -88,6 +88,57 @@ class Event(Base, TimestampMixin):
     type: Mapped[str] = mapped_column(String(128), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlertRule(Base, TimestampMixin):
+    __tablename__ = "alert_rules"
+    __table_args__ = (UniqueConstraint("name", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    rule_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    scope: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    condition: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    fingerprint_template: Mapped[str] = mapped_column(String(256), nullable=False)
+    enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+
+class Alert(Base, TimestampMixin):
+    __tablename__ = "alerts"
+    __table_args__ = (Index("ix_alerts_fingerprint_status", "fingerprint", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    rule_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    rule_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(256), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="firing")
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False
+    )
+    environment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("environments.id"), nullable=False
+    )
+    event_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    context: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RuleState(Base, TimestampMixin):
+    __tablename__ = "rule_state"
+    __table_args__ = (UniqueConstraint("rule_name", "agent_id", "key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    rule_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False
+    )
+    key: Mapped[str] = mapped_column(String(256), nullable=False)
+    state: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
 class AuditLog(Base, TimestampMixin):
