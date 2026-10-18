@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.audit import record
 from app.db import get_db
-from app.models import Agent, EnrollmentToken, Environment
+from app.models import Agent, AgentConfig, EnrollmentToken, Environment
 from app.security import authenticated_agent, token_hash
 
 router = APIRouter(prefix="/v1/agents")
@@ -70,6 +70,22 @@ def enroll(payload: EnrollRequest, request: Request, db: Session = Depends(get_d
     )
     db.commit()
     return EnrollResponse(agent_id=str(agent.id), secret=agent.secret)
+
+
+@router.get("/config")
+def get_config(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(authenticated_agent),
+):
+    latest = db.scalar(
+        select(AgentConfig)
+        .where(AgentConfig.agent_id == agent.id)
+        .order_by(AgentConfig.version.desc())
+        .limit(1)
+    )
+    if latest is None:
+        return {"version": 0, "config": {}}
+    return {"version": latest.version, "config": latest.config}
 
 
 @router.post("/heartbeat")

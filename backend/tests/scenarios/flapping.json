@@ -1,0 +1,8 @@
+[
+  {"path": "/v1/events", "items": [{"type": "systemd.service", "payload": {"unit": "nginx", "active_state": "inactive", "sub_state": "dead", "restarts": 1}}]},
+  {"path": "/v1/events", "items": [{"type": "systemd.service", "payload": {"unit": "nginx", "active_state": "active", "sub_state": "running", "restarts": 1}}]},
+  {"path": "/v1/events", "items": [{"type": "systemd.service", "payload": {"unit": "nginx", "active_state": "inactive", "sub_state": "dead", "restarts": 2}}]},
+  {"path": "/v1/events", "items": [{"type": "systemd.service", "payload": {"unit": "nginx", "active_state": "active", "sub_state": "running", "restarts": 2}}]},
+  {"path": "/v1/events", "items": [{"type": "systemd.service", "payload": {"unit": "nginx", "active_state": "inactive", "sub_state": "dead", "restarts": 3}}]},
+  {"path": "/v1/events", "items": [{"type": "systemd.service", "payload": {"unit": "nginx", "active_state": "active", "sub_state": "running", "restarts": 3}}]}
+]

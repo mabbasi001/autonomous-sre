@@ -35,7 +35,15 @@ func (c *Client) Post(path string, payload any) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
+	return c.do(http.MethodPost, path, body)
+}
+
+func (c *Client) Get(path string) (*http.Response, error) {
+	return c.do(http.MethodGet, path, nil)
+}
+
+func (c *Client) do(method, path string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(method, c.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +51,7 @@ func (c *Client) Post(path string, payload any) (*http.Response, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Agent-Id", c.AgentID)
 	req.Header.Set("X-Timestamp", ts)
-	req.Header.Set("X-Signature", Sign(c.Secret, http.MethodPost, path, ts, body))
+	req.Header.Set("X-Signature", Sign(c.Secret, method, path, ts, body))
 
 	httpClient := c.HTTP
 	if httpClient == nil {
