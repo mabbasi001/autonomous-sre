@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://sre:sre@localhost:5432/sre"
     log_level: str = "INFO"
     environment: str = "development"
+    slack_webhook_url: str = ""
 
 
 settings = Settings()

@@ -33,7 +33,9 @@ def clean_tables(test_database):
     from app.db import engine
 
     with engine.begin() as conn:
-        conn.execute(text("truncate agents, enrollment_tokens, audit_logs cascade"))
+        conn.execute(
+            text("truncate agents, enrollment_tokens, audit_logs, notifications cascade")
+        )
 
 
 @pytest.fixture()
