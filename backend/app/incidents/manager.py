@@ -12,7 +12,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.audit import record
-from app.models import Agent, Alert, Event, Incident, IncidentEvent, IncidentEvidence
+from app.models import Agent, Alert, Environment, Event, Incident, IncidentEvent, IncidentEvidence
+from app.notifications.service import notify
 
 TERMINAL_STATUSES = {"RESOLVED", "CLOSED"}
 
@@ -37,6 +38,18 @@ RECENT_EVIDENCE_LIMIT = 50
 
 class InvalidTransition(Exception):
     pass
+
+
+def notify_incident(db: Session, event_type: str, incident: Incident) -> None:
+    agent = db.get(Agent, incident.agent_id)
+    environment = db.get(Environment, incident.environment_id)
+    notify(
+        db,
+        event_type,
+        incident,
+        hostname=agent.hostname if agent else "unknown",
+        environment=environment.name if environment else "unknown",
+    )
 
 
 def open_incident_for(db: Session, fingerprint: str) -> Incident | None:
@@ -117,6 +130,7 @@ def open_incident(db: Session, alert: Alert) -> Incident:
         entity_id=str(incident.id),
         detail={"fingerprint": incident.fingerprint, "severity": incident.severity},
     )
+    notify_incident(db, "incident.opened", incident)
     return incident
 
 
@@ -165,4 +179,6 @@ def transition(
         correlation_id=correlation_id,
         detail={"from": from_status, "to": to_status, "reason": reason},
     )
+    if to_status == "ESCALATED":
+        notify_incident(db, "incident.escalated", incident)
     return incident

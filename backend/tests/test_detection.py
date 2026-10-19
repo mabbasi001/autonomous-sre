@@ -157,7 +157,7 @@ def test_rule_edit_versions_and_old_alerts_keep_theirs(sim, db, client):
         json={
             "name": "nginx-service-down",
             "rule_type": "state_change",
-            "severity": "critical",
+            "severity": "high",
             "condition": {
                 "event_type": "systemd.service",
                 "match": {"unit": "nginx"},

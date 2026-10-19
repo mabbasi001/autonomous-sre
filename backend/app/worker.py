@@ -6,6 +6,7 @@ from app.db import SessionLocal
 from app.detection.engine import absence_sweep, process_pending_events
 from app.incidents.manager import process_new_alerts
 from app.logging import setup_logging
+from app.notifications.service import deliver_pending
 
 setup_logging(settings.log_level)
 logger = logging.getLogger("worker")
@@ -18,6 +19,7 @@ def tick() -> tuple[int, int]:
         fired = process_pending_events(db)
         fired += absence_sweep(db)
         opened = process_new_alerts(db)
+        deliver_pending(db)
     return fired, opened
 
 
