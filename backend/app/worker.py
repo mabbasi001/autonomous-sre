@@ -4,6 +4,7 @@ import time
 from app.config import settings
 from app.db import SessionLocal
 from app.detection.engine import absence_sweep, process_pending_events
+from app.incidents.manager import process_new_alerts
 from app.logging import setup_logging
 
 setup_logging(settings.log_level)
@@ -12,20 +13,21 @@ logger = logging.getLogger("worker")
 POLL_SECONDS = 2
 
 
-def tick() -> int:
+def tick() -> tuple[int, int]:
     with SessionLocal() as db:
         fired = process_pending_events(db)
         fired += absence_sweep(db)
-    return fired
+        opened = process_new_alerts(db)
+    return fired, opened
 
 
 def main() -> None:
     logger.info("worker starting")
     while True:
         try:
-            fired = tick()
-            if fired:
-                logger.info(f"fired {fired} alert(s)")
+            fired, opened = tick()
+            if fired or opened:
+                logger.info(f"fired {fired} alert(s), opened {opened} incident(s)")
         except Exception:
             logger.exception("detection tick failed")
         time.sleep(POLL_SECONDS)

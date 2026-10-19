@@ -126,6 +126,53 @@ class Alert(Base, TimestampMixin):
     context: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    incident_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=True
+    )
+
+
+class Incident(Base, TimestampMixin):
+    __tablename__ = "incidents"
+    __table_args__ = (Index("ix_incidents_fingerprint_status", "fingerprint", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    fingerprint: Mapped[str] = mapped_column(String(256), nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="OPEN")
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False
+    )
+    environment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("environments.id"), nullable=False
+    )
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class IncidentEvent(Base, TimestampMixin):
+    __tablename__ = "incident_events"
+    __table_args__ = (UniqueConstraint("incident_id", "event_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False
+    )
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("events.id"), nullable=False
+    )
+
+
+class IncidentEvidence(Base, TimestampMixin):
+    __tablename__ = "incident_evidence"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    ref: Mapped[str] = mapped_column(String(64), nullable=False)
+    summary: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
 class RuleState(Base, TimestampMixin):
