@@ -188,6 +188,56 @@ class RuleState(Base, TimestampMixin):
     state: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
+class Policy(Base, TimestampMixin):
+    __tablename__ = "policies"
+    __table_args__ = (UniqueConstraint("name", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    environment: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    allowed_targets: Mapped[list] = mapped_column(JSONB, nullable=False)
+    mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    rate_limit: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    cooldown_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_retries: Mapped[int] = mapped_column(Integer, nullable=False)
+    enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+
+class PolicyDecision(Base, TimestampMixin):
+    __tablename__ = "policy_decisions"
+    __table_args__ = (
+        Index("ix_policy_decisions_action_target", "action", "target", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    target: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False
+    )
+    environment: Mapped[str] = mapped_column(String(64), nullable=False)
+    incident_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=True
+    )
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(256), nullable=False)
+    policy_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    policy_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    inputs: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+
+class KillSwitch(Base, TimestampMixin):
+    __tablename__ = "kill_switches"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scope: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    engaged: Mapped[bool] = mapped_column(nullable=False, default=False)
+    reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Notification(Base, TimestampMixin):
     __tablename__ = "notifications"
 

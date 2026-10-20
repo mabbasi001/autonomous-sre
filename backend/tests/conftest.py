@@ -34,7 +34,10 @@ def clean_tables(test_database):
 
     with engine.begin() as conn:
         conn.execute(
-            text("truncate agents, enrollment_tokens, audit_logs, notifications cascade")
+            text(
+                "truncate agents, enrollment_tokens, audit_logs, notifications,"
+                " kill_switches cascade"
+            )
         )
 
 
