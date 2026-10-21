@@ -5,9 +5,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import require
 from app.db import get_db
 from app.incidents.manager import TRANSITIONS, InvalidTransition, transition
-from app.models import Event, Incident, IncidentEvent, IncidentEvidence
+from app.models import Event, Incident, IncidentEvent, IncidentEvidence, User
 
 router = APIRouter(prefix="/v1/incidents")
 
@@ -42,7 +43,11 @@ def get_incident(incident_id: str, db: Session) -> Incident:
 
 
 @router.get("")
-def list_incidents(status: str | None = None, db: Session = Depends(get_db)):
+def list_incidents(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("viewer")),
+):
     query = select(Incident).order_by(Incident.opened_at.desc())
     if status:
         query = query.where(Incident.status == status)
@@ -50,7 +55,11 @@ def list_incidents(status: str | None = None, db: Session = Depends(get_db)):
 
 
 @router.get("/{incident_id}")
-def incident_detail(incident_id: str, db: Session = Depends(get_db)):
+def incident_detail(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("viewer")),
+):
     incident = get_incident(incident_id, db)
 
     evidence = db.scalars(
@@ -88,6 +97,7 @@ def transition_incident(
     payload: TransitionIn,
     request: Request,
     db: Session = Depends(get_db),
+    user: User = Depends(require("operator")),
 ):
     incident = get_incident(incident_id, db)
     try:
@@ -96,6 +106,7 @@ def transition_incident(
             incident,
             payload.to_status,
             actor_type="user",
+            actor_id=user.email,
             reason=payload.reason,
             correlation_id=getattr(request.state, "correlation_id", None),
         )

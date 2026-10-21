@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
-from app.api import agents, alert_rules, incidents, ingestion, policies
+from app.api import agents, alert_rules, approvals, incidents, ingestion, policies
 from app.config import settings
 from app.logging import setup_logging
 
@@ -52,3 +52,4 @@ app.include_router(ingestion.router)
 app.include_router(alert_rules.router)
 app.include_router(incidents.router)
 app.include_router(policies.router)
+app.include_router(approvals.router)

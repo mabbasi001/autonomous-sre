@@ -6,8 +6,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.audit import record
+from app.auth import require
 from app.db import get_db
-from app.models import Environment, KillSwitch, Policy
+from app.models import Environment, KillSwitch, Policy, User
 from app.policies.catalogue import CATALOGUE
 
 router = APIRouter(prefix="/v1")
@@ -41,7 +42,7 @@ def serialize_policy(policy: Policy) -> dict:
 
 
 @router.get("/policies")
-def list_policies(db: Session = Depends(get_db)):
+def list_policies(db: Session = Depends(get_db), user: User = Depends(require("viewer"))):
     rows = db.scalars(select(Policy).order_by(Policy.name, Policy.version.desc())).all()
     latest: dict[str, Policy] = {}
     for policy in rows:
@@ -50,7 +51,12 @@ def list_policies(db: Session = Depends(get_db)):
 
 
 @router.post("/policies", status_code=201)
-def create_policy(payload: PolicyIn, request: Request, db: Session = Depends(get_db)):
+def create_policy(
+    payload: PolicyIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin")),
+):
     if payload.action not in CATALOGUE:
         raise HTTPException(status_code=422, detail=f"action not in catalogue: {payload.action}")
     if payload.mode not in ("auto", "approval"):
@@ -64,6 +70,7 @@ def create_policy(payload: PolicyIn, request: Request, db: Session = Depends(get
     record(
         db,
         actor_type="user",
+        actor_id=user.email,
         event_type="policy.updated",
         entity_type="policy",
         entity_id=payload.name,
@@ -89,14 +96,18 @@ def serialize_switch(switch: KillSwitch) -> dict:
 
 
 @router.get("/kill-switches")
-def list_kill_switches(db: Session = Depends(get_db)):
+def list_kill_switches(db: Session = Depends(get_db), user: User = Depends(require("viewer"))):
     rows = db.scalars(select(KillSwitch).order_by(KillSwitch.scope)).all()
     return {"kill_switches": [serialize_switch(s) for s in rows]}
 
 
 @router.put("/kill-switches/{scope}")
 def set_kill_switch(
-    scope: str, payload: KillSwitchIn, request: Request, db: Session = Depends(get_db)
+    scope: str,
+    payload: KillSwitchIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin")),
 ):
     if scope != "global":
         prefix, _, name = scope.partition(":")
@@ -114,6 +125,7 @@ def set_kill_switch(
     record(
         db,
         actor_type="user",
+        actor_id=user.email,
         event_type="kill_switch.engaged" if payload.engaged else "kill_switch.disengaged",
         entity_type="kill_switch",
         entity_id=scope,
