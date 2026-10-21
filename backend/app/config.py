@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     environment: str = "development"
     slack_webhook_url: str = ""
+    oidc_tenant_id: str = ""
+    oidc_client_id: str = ""
+    oidc_jwks: str = ""  # inline JWKS JSON; when empty the tenant's JWKS endpoint is fetched
+    approval_ttl_seconds: int = 900
 
 
 settings = Settings()

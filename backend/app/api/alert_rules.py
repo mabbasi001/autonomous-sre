@@ -4,8 +4,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.audit import record
+from app.auth import require
 from app.db import get_db
-from app.models import AlertRule
+from app.models import AlertRule, User
 
 router = APIRouter(prefix="/v1/alert-rules")
 
@@ -36,7 +37,7 @@ def serialize(rule: AlertRule) -> dict:
 
 
 @router.get("")
-def list_rules(db: Session = Depends(get_db)):
+def list_rules(db: Session = Depends(get_db), user: User = Depends(require("viewer"))):
     rows = db.scalars(select(AlertRule).order_by(AlertRule.name, AlertRule.version.desc())).all()
     latest: dict[str, AlertRule] = {}
     for rule in rows:
@@ -45,7 +46,12 @@ def list_rules(db: Session = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-def create_rule(payload: AlertRuleIn, request: Request, db: Session = Depends(get_db)):
+def create_rule(
+    payload: AlertRuleIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("admin")),
+):
     if payload.rule_type not in RULE_TYPES:
         raise HTTPException(status_code=422, detail=f"unknown rule_type: {payload.rule_type}")
 
@@ -57,6 +63,7 @@ def create_rule(payload: AlertRuleIn, request: Request, db: Session = Depends(ge
     record(
         db,
         actor_type="user",
+        actor_id=user.email,
         event_type="alert_rule.updated",
         entity_type="alert_rule",
         entity_id=payload.name,
