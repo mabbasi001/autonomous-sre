@@ -270,8 +270,62 @@ class Approval(Base, TimestampMixin):
     requested_by: Mapped[str] = mapped_column(String(320), nullable=False)
     decided_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
     decision_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Command(Base, TimestampMixin):
+    __tablename__ = "commands"
+    __table_args__ = (Index("ix_commands_agent_status", "agent_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False
+    )
+    incident_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=True
+    )
+    policy_decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("policy_decisions.id"), nullable=True
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    acked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RemediationRun(Base, TimestampMixin):
+    __tablename__ = "remediation_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False
+    )
+    command_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("commands.id"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    target: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="running")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ActionExecution(Base, TimestampMixin):
+    __tablename__ = "action_executions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    command_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("commands.id"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    exit_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Notification(Base, TimestampMixin):
