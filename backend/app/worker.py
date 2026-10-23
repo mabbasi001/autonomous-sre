@@ -2,6 +2,7 @@ import logging
 import time
 
 from app.approvals.service import expire_pending
+from app.commands.service import expire_commands
 from app.config import settings
 from app.db import SessionLocal
 from app.detection.engine import absence_sweep, process_pending_events
@@ -21,6 +22,7 @@ def tick() -> tuple[int, int]:
         fired += absence_sweep(db)
         opened = process_new_alerts(db)
         expire_pending(db)
+        expire_commands(db)
         deliver_pending(db)
     return fired, opened
 

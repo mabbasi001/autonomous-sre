@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -7,8 +8,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.audit import record
+from app.commands.service import expire_command, record_result
 from app.db import get_db
-from app.models import Agent, AgentConfig, EnrollmentToken, Environment
+from app.models import Agent, AgentConfig, Command, EnrollmentToken, Environment
 from app.security import authenticated_agent, token_hash
 
 router = APIRouter(prefix="/v1/agents")
@@ -99,6 +101,103 @@ def heartbeat(
     agent.last_seen_at = datetime.now(UTC)
     db.commit()
     return {"status": "ok"}
+
+
+class CommandResultIn(BaseModel):
+    status: str = Field(pattern="^(succeeded|failed|rejected|duplicate|timeout)$")
+    exit_status: int | None = None
+    output: str | None = Field(default=None, max_length=8192)
+    error: str | None = Field(default=None, max_length=2048)
+    duration_ms: int | None = None
+
+
+def owned_command(command_id: str, agent: Agent, db: Session) -> Command:
+    try:
+        command = db.get(Command, uuid.UUID(command_id))
+    except ValueError:
+        command = None
+    if command is None or command.agent_id != agent.id:
+        raise HTTPException(status_code=404, detail="command not found")
+    return command
+
+
+def expired_guard(db: Session, command: Command) -> None:
+    now = db.scalar(select(func.now()))
+    if command.expires_at < now:
+        expire_command(db, command)
+        db.commit()
+        raise HTTPException(status_code=409, detail="command expired")
+
+
+@router.get("/commands")
+def pending_commands(
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(authenticated_agent),
+):
+    now = db.scalar(select(func.now()))
+    commands = db.scalars(
+        select(Command)
+        .where(
+            Command.agent_id == agent.id,
+            Command.status.in_(("pending", "delivered")),
+            Command.expires_at >= now,
+        )
+        .order_by(Command.created_at)
+    ).all()
+    return {
+        "commands": [
+            {
+                "id": str(c.id),
+                "action": c.action,
+                "params": c.params,
+                "idempotency_key": c.idempotency_key,
+                "expires_at": c.expires_at.isoformat(),
+            }
+            for c in commands
+        ]
+    }
+
+
+@router.post("/commands/{command_id}/ack")
+def ack_command(
+    command_id: str,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(authenticated_agent),
+):
+    command = owned_command(command_id, agent, db)
+    if command.status not in ("pending", "delivered"):
+        raise HTTPException(status_code=409, detail=f"command is {command.status}")
+    expired_guard(db, command)
+    command.status = "delivered"
+    command.acked_at = datetime.now(UTC)
+    db.commit()
+    return {"status": "delivered"}
+
+
+@router.post("/commands/{command_id}/result")
+def command_result(
+    command_id: str,
+    payload: CommandResultIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    agent: Agent = Depends(authenticated_agent),
+):
+    command = owned_command(command_id, agent, db)
+    if command.status not in ("pending", "delivered"):
+        raise HTTPException(status_code=409, detail=f"command is {command.status}")
+    expired_guard(db, command)
+    record_result(
+        db,
+        command,
+        status=payload.status,
+        exit_status=payload.exit_status,
+        output=payload.output,
+        error=payload.error,
+        duration_ms=payload.duration_ms,
+        correlation_id=getattr(request.state, "correlation_id", None),
+    )
+    db.commit()
+    return {"status": command.status}
 
 
 @router.post("/credentials/rotate", response_model=EnrollResponse)

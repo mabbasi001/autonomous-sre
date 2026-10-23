@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     oidc_client_id: str = ""
     oidc_jwks: str = ""  # inline JWKS JSON; when empty the tenant's JWKS endpoint is fetched
     approval_ttl_seconds: int = 900
+    command_expiry_seconds: int = 120
 
 
 settings = Settings()

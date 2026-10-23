@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.approvals.service import ApprovalError, decide_approval
 from app.auth import require
+from app.commands.service import dispatch
 from app.db import get_db
-from app.models import Approval, User
+from app.models import Approval, Incident, PolicyDecision, User
 
 router = APIRouter(prefix="/v1/approvals")
 
@@ -60,6 +61,7 @@ def decide(
     if approval is None:
         raise HTTPException(status_code=404, detail="approval not found")
 
+    correlation_id = getattr(request.state, "correlation_id", None)
     try:
         decide_approval(
             db,
@@ -67,9 +69,14 @@ def decide(
             payload.decision,
             decided_by=user.email,
             reason=payload.reason,
-            correlation_id=getattr(request.state, "correlation_id", None),
+            correlation_id=correlation_id,
         )
     except ApprovalError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
     db.commit()
+
+    if approval.status == "approved":
+        incident = db.get(Incident, approval.incident_id)
+        decision = db.get(PolicyDecision, approval.policy_decision_id)
+        dispatch(db, incident, decision, approval.params, correlation_id)
     return serialize(approval)

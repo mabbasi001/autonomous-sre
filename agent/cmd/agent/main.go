@@ -13,6 +13,7 @@ import (
 	"github.com/mabbasi001/autonomous-sre/agent/internal/collectors"
 	"github.com/mabbasi001/autonomous-sre/agent/internal/config"
 	"github.com/mabbasi001/autonomous-sre/agent/internal/enrollment"
+	"github.com/mabbasi001/autonomous-sre/agent/internal/executor"
 	"github.com/mabbasi001/autonomous-sre/agent/internal/runner"
 	"github.com/mabbasi001/autonomous-sre/agent/internal/spool"
 	"github.com/mabbasi001/autonomous-sre/agent/internal/transport"
@@ -21,9 +22,10 @@ import (
 var version = "0.1.0-dev" // overridden at build time via -ldflags
 
 const (
-	heartbeatInterval  = 30 * time.Second
-	configPollInterval = 5 * time.Minute
-	spoolMaxBytes      = 10 << 20
+	heartbeatInterval   = 30 * time.Second
+	configPollInterval  = 5 * time.Minute
+	commandPollInterval = 10 * time.Second
+	spoolMaxBytes       = 10 << 20
 )
 
 func main() {
@@ -79,6 +81,13 @@ func main() {
 	go heartbeatLoop(client)
 
 	remote, remoteVersion := fetchRemoteConfig(client, -1, config.Remote{CollectIntervalSeconds: 60})
+
+	exec, err := executor.New(cfg.StateDir, remote.Services)
+	if err != nil {
+		log.Fatalf("init executor: %v", err)
+	}
+	go commandLoop(client, exec)
+
 	run := &runner.Runner{Client: client, Spool: queue, Collectors: buildCollectors(remote)}
 	lastPoll := time.Now()
 
@@ -93,9 +102,19 @@ func main() {
 			if newVersion != remoteVersion {
 				remoteVersion = newVersion
 				run.Collectors = buildCollectors(remote)
+				exec.SetAllowedServices(remote.Services)
 				log.Printf("applied config version %d", remoteVersion)
 			}
 		}
+	}
+}
+
+func commandLoop(client *transport.Client, exec *executor.Executor) {
+	for {
+		if err := executor.Poll(client, exec); err != nil {
+			log.Printf("command poll failed: %v", err)
+		}
+		time.Sleep(commandPollInterval)
 	}
 }
 
