@@ -51,6 +51,7 @@ settings.oidc_tenant_id = TEST_TENANT
 settings.oidc_client_id = TEST_CLIENT_ID
 settings.oidc_jwks = json.dumps(TEST_JWKS)
 settings.slack_webhook_url = ""  # a developer's .env must not leak into tests
+settings.anthropic_api_key = ""
 
 
 def operator_token(

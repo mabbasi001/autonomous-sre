@@ -7,6 +7,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.detection.engine import absence_sweep, process_pending_events
 from app.incidents.manager import process_new_alerts
+from app.investigation.service import investigate_open_incidents
 from app.logging import setup_logging
 from app.notifications.service import deliver_pending
 
@@ -21,6 +22,7 @@ def tick() -> tuple[int, int]:
         fired = process_pending_events(db)
         fired += absence_sweep(db)
         opened = process_new_alerts(db)
+        investigate_open_incidents(db)
         expire_pending(db)
         expire_commands(db)
         deliver_pending(db)

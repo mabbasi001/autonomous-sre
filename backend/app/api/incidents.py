@@ -91,6 +91,31 @@ def incident_detail(
     }
 
 
+@router.post("/{incident_id}/investigate")
+def investigate_incident(
+    incident_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require("operator")),
+):
+    from app.investigation.service import investigate
+
+    incident = get_incident(incident_id, db)
+    if incident.status not in ("OPEN", "MANUAL_TRIAGE"):
+        raise HTTPException(
+            status_code=409, detail=f"cannot investigate an incident in {incident.status}"
+        )
+    investigation = investigate(
+        db, incident, correlation_id=getattr(request.state, "correlation_id", None)
+    )
+    return {
+        "investigation_id": str(investigation.id),
+        "status": investigation.status,
+        "attempts": investigation.attempts,
+        "incident_status": incident.status,
+    }
+
+
 @router.post("/{incident_id}/transition")
 def transition_incident(
     incident_id: str,
