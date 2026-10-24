@@ -328,6 +328,23 @@ class ActionExecution(Base, TimestampMixin):
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
+class AIInvestigation(Base, TimestampMixin):
+    __tablename__ = "ai_investigations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False
+    )
+    model: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    request: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    response: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    diagnosis: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    usage: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Notification(Base, TimestampMixin):
     __tablename__ = "notifications"
 
