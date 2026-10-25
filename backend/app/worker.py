@@ -10,6 +10,7 @@ from app.incidents.manager import process_new_alerts
 from app.investigation.service import investigate_open_incidents
 from app.logging import setup_logging
 from app.notifications.service import deliver_pending
+from app.verification.service import run_verifications
 
 setup_logging(settings.log_level)
 logger = logging.getLogger("worker")
@@ -25,6 +26,7 @@ def tick() -> tuple[int, int]:
         investigate_open_incidents(db)
         expire_pending(db)
         expire_commands(db)
+        run_verifications(db)
         deliver_pending(db)
     return fired, opened
 

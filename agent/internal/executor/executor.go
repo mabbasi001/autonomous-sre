@@ -145,7 +145,8 @@ func (e *Executor) dispatch(cmd Command) Result {
 	case "service.restart":
 		return e.serviceCommand(cmd, "sudo", "-n", "systemctl", "restart")
 	case "service.status":
-		return e.serviceCommand(cmd, "systemctl", "show", "--no-pager")
+		return e.serviceCommand(cmd, "systemctl", "show", "--no-pager",
+			"--property=ActiveState,SubState,NRestarts")
 	case "logs.collect_excerpt":
 		return e.collectLogs(cmd)
 	case "http.check":
