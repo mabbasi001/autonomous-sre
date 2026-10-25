@@ -345,6 +345,20 @@ class AIInvestigation(Base, TimestampMixin):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class Verification(Base, TimestampMixin):
+    __tablename__ = "verifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=False
+    )
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    checks: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    not_before: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Notification(Base, TimestampMixin):
     __tablename__ = "notifications"
 

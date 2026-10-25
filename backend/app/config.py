@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     ai_max_output_tokens: int = 2000
     ai_evidence_max_chars: int = 12000
     ai_token_budget: int = 20000
+    verify_settle_seconds: int = 10
+    verify_max_attempts: int = 2
 
 
 settings = Settings()

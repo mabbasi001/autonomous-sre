@@ -21,6 +21,7 @@ BACKOFF_BASE_SECONDS = 30
 HEADLINES = {
     "incident.opened": "incident opened",
     "incident.escalated": "incident ESCALATED",
+    "incident.resolved": "incident resolved",
     "approval.requested": "approval required",
 }
 
