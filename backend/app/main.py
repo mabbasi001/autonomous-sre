@@ -1,11 +1,21 @@
 import logging
 import uuid
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
-from app.api import agents, alert_rules, approvals, audit, incidents, ingestion, policies
+from app.api import (
+    agents,
+    alert_rules,
+    approvals,
+    audit,
+    incidents,
+    ingestion,
+    inventory,
+    policies,
+)
+from app.auth import current_user
 from app.config import settings
 from app.logging import setup_logging
 
@@ -42,6 +52,11 @@ def healthz() -> dict:
     return {"status": "ok", "environment": settings.environment}
 
 
+@app.get("/v1/me")
+def me(user=Depends(current_user)) -> dict:
+    return {"email": user.email, "display_name": user.display_name, "role": user.role}
+
+
 @app.get("/metrics")
 def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
@@ -54,3 +69,4 @@ app.include_router(incidents.router)
 app.include_router(policies.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)
+app.include_router(inventory.router)

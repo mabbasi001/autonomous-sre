@@ -50,11 +50,16 @@ services:
         condition: service_healthy
 
   web:
-    image: nginx:alpine
-    volumes:
-      - ../../dashboard/public:/usr/share/nginx/html:ro
+    build:
+      context: ../..
+      dockerfile: deploy/containers/dashboard.Dockerfile
+    environment:
+      SRE_API_URL: http://api:8000
     ports:
-      - "3000:80"
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:
