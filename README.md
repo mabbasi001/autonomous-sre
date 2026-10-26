@@ -68,6 +68,7 @@ make db        # postgres in docker, exposed on localhost:5432
 make migrate
 make api       # uvicorn with reload on :8000
 make worker    # in a second terminal
+make dashboard # next.js operator UI on :3000 (optional)
 curl -s localhost:8000/healthz
 ```
 

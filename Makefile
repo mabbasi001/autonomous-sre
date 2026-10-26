@@ -17,6 +17,9 @@ api:
 worker:
 	cd backend && uv run python -m app.worker
 
+dashboard:
+	cd dashboard && SRE_API_URL=http://localhost:8000 npm run dev
+
 test:
 	cd backend && uv run pytest
 	cd agent && go test ./...
