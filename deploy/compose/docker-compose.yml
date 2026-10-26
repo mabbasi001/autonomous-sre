@@ -22,7 +22,8 @@ services:
       context: ../..
       dockerfile: deploy/containers/backend.Dockerfile
     environment:
-      SRE_DATABASE_URL: postgresql+psycopg://sre:sre@postgres:5432/sre
+      SRE_DATABASE_URL: postgresql+psycopg://sre_app:sre_app@postgres:5432/sre
+      SRE_MIGRATION_DATABASE_URL: postgresql+psycopg://sre:sre@postgres:5432/sre
       SRE_ENVIRONMENT: development
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
@@ -41,7 +42,7 @@ services:
       context: ../..
       dockerfile: deploy/containers/backend.Dockerfile
     environment:
-      SRE_DATABASE_URL: postgresql+psycopg://sre:sre@postgres:5432/sre
+      SRE_DATABASE_URL: postgresql+psycopg://sre_app:sre_app@postgres:5432/sre
       SRE_ENVIRONMENT: development
     command: python -m app.worker
     depends_on:

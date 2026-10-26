@@ -3,6 +3,7 @@ import os
 os.environ["SRE_DATABASE_URL"] = os.environ.get(
     "SRE_TEST_DATABASE_URL", "postgresql+psycopg://sre:sre@localhost:5432/sre_test"
 )
+os.environ["SRE_MIGRATION_DATABASE_URL"] = os.environ["SRE_DATABASE_URL"]
 
 import base64
 import json

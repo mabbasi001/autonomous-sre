@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SRE_", env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+psycopg://sre:sre@localhost:5432/sre"
+    migration_database_url: str = ""  # falls back to database_url
     log_level: str = "INFO"
     environment: str = "development"
     slack_webhook_url: str = ""
