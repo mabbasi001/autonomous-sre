@@ -183,6 +183,15 @@ def investigate(
     def triage(status: str, error: str) -> AIInvestigation:
         investigation.status = status
         investigation.error = error
+        record(
+            db,
+            actor_type="system",
+            event_type=f"investigation.{status}",
+            entity_type="incident",
+            entity_id=str(incident.id),
+            correlation_id=correlation_id,
+            detail={"investigation_id": str(investigation.id), "error": error},
+        )
         transition(
             db,
             incident,
@@ -230,6 +239,19 @@ def investigate(
 
     investigation.status = "completed"
     investigation.diagnosis = diagnosis.model_dump()
+    record(
+        db,
+        actor_type="system",
+        event_type="investigation.completed",
+        entity_type="incident",
+        entity_id=str(incident.id),
+        correlation_id=correlation_id,
+        detail={
+            "investigation_id": str(investigation.id),
+            "confidence": diagnosis.confidence,
+            "attempts": investigation.attempts,
+        },
+    )
     db.add(
         IncidentEvidence(
             incident_id=incident.id,

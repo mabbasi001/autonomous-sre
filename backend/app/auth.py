@@ -14,6 +14,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.audit import record
 from app.config import settings
 from app.db import get_db
 from app.models import User
@@ -84,9 +85,21 @@ async def current_user(
         user = User(email=email, display_name=claims.get("name", email), role=role)
         db.add(user)
     else:
+        if user.role != role:
+            record(
+                db,
+                actor_type="user",
+                actor_id=email,
+                event_type="user.role_changed",
+                entity_type="user",
+                entity_id=email,
+                correlation_id=getattr(request.state, "correlation_id", None),
+                detail={"from": user.role, "to": role},
+            )
         user.role = role
         user.display_name = claims.get("name", user.display_name)
-    db.flush()
+    db.commit()  # identity persists independently of whatever the request does next
+    db.refresh(user)
     return user
 
 
@@ -95,7 +108,8 @@ def _dev_admin(db: Session) -> User:
     if user is None:
         user = User(email="dev@localhost", display_name="Dev Admin", role="admin")
         db.add(user)
-        db.flush()
+        db.commit()
+        db.refresh(user)
         logger.warning("OIDC not configured: using synthetic dev admin")
     return user
 
