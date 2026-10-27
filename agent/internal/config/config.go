@@ -37,6 +37,7 @@ type Remote struct {
 	Services               []string          `json:"services"`
 	HTTPChecks             []HTTPCheckConfig `json:"http_checks"`
 	LogUnits               []LogUnitConfig   `json:"log_units"`
+	IISAppPools            []string          `json:"iis_app_pools"`
 }
 
 type HTTPCheckConfig struct {
