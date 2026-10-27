@@ -1,0 +1,10 @@
+{
+  "name": "prod-service-restart",
+  "environment": "production",
+  "action": "service.restart",
+  "allowed_targets": ["nginx"],
+  "mode": "approval",
+  "rate_limit": { "max": 2, "window_seconds": 3600 },
+  "cooldown_seconds": 600,
+  "max_retries": 1
+}

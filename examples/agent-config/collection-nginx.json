@@ -1,0 +1,10 @@
+{
+  "collect_interval_seconds": 15,
+  "services": ["nginx"],
+  "http_checks": [
+    { "name": "web", "url": "http://localhost/", "timeout_seconds": 3 }
+  ],
+  "log_units": [
+    { "unit": "nginx", "max_lines": 50 }
+  ]
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Autonomous SRE agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sre-agent
+ExecStart=/usr/local/bin/sre-agent -config /etc/autonomous-sre/agent.yaml
+Restart=always
+RestartSec=5
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=false
+ReadWritePaths=/var/lib/autonomous-sre
+
+[Install]
+WantedBy=multi-user.target

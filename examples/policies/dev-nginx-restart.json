@@ -1,0 +1,10 @@
+{
+  "name": "dev-service-restart",
+  "environment": "development",
+  "action": "service.restart",
+  "allowed_targets": ["nginx"],
+  "mode": "auto",
+  "rate_limit": { "max": 3, "window_seconds": 3600 },
+  "cooldown_seconds": 300,
+  "max_retries": 2
+}
