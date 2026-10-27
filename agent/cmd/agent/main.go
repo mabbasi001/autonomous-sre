@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/mabbasi001/autonomous-sre/agent/internal/collectors"
@@ -57,8 +58,21 @@ func main() {
 			log.Fatalf("save credentials: %v", err)
 		}
 		log.Printf("enrolled as agent %s", creds.AgentID)
+		return // enrollment is a one-shot; the service/daemon runs without -enroll
 	}
 
+	if isWindowsService() {
+		if err := runService("autonomous-sre", func(stop <-chan struct{}) { runAgent(cfg, stop) }); err != nil {
+			log.Fatalf("service run: %v", err)
+		}
+		return
+	}
+	runAgent(cfg, nil)
+}
+
+// runAgent is the main loop. A non-nil stop channel (Windows service) ends
+// it gracefully; console/Linux runs pass nil and run until killed.
+func runAgent(cfg config.Config, stop <-chan struct{}) {
 	creds, err := enrollment.Load(cfg.StateDir)
 	if err != nil {
 		log.Fatalf("no credentials in %s: run with -enroll <token> first", cfg.StateDir)
@@ -86,6 +100,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("init executor: %v", err)
 	}
+	exec.SetAllowedAppPools(remote.IISAppPools)
 	go commandLoop(client, exec)
 
 	run := &runner.Runner{Client: client, Spool: queue, Collectors: buildCollectors(remote)}
@@ -93,7 +108,12 @@ func main() {
 
 	for {
 		run.Cycle()
-		time.Sleep(time.Duration(remote.CollectIntervalSeconds) * time.Second)
+		select {
+		case <-stop:
+			log.Printf("stop requested, shutting down")
+			return
+		case <-time.After(time.Duration(remote.CollectIntervalSeconds) * time.Second):
+		}
 
 		if time.Since(lastPoll) >= configPollInterval {
 			lastPoll = time.Now()
@@ -103,6 +123,7 @@ func main() {
 				remoteVersion = newVersion
 				run.Collectors = buildCollectors(remote)
 				exec.SetAllowedServices(remote.Services)
+				exec.SetAllowedAppPools(remote.IISAppPools)
 				log.Printf("applied config version %d", remoteVersion)
 			}
 		}
@@ -119,10 +140,7 @@ func commandLoop(client *transport.Client, exec *executor.Executor) {
 }
 
 func buildCollectors(remote config.Remote) []collectors.Collector {
-	list := []collectors.Collector{&collectors.Host{}, collectors.Network{}}
-	if len(remote.Services) > 0 {
-		list = append(list, &collectors.Systemd{Units: remote.Services})
-	}
+	list := []collectors.Collector{collectors.PlatformHost(), collectors.Network{}}
 	if len(remote.HTTPChecks) > 0 {
 		var checks []collectors.HTTPCheck
 		for _, check := range remote.HTTPChecks {
@@ -134,12 +152,25 @@ func buildCollectors(remote config.Remote) []collectors.Collector {
 		}
 		list = append(list, &collectors.HTTPChecker{Checks: checks})
 	}
-	if len(remote.LogUnits) > 0 {
-		var units []collectors.LogUnit
-		for _, unit := range remote.LogUnits {
-			units = append(units, collectors.LogUnit{Unit: unit.Unit, MaxLines: unit.MaxLines})
+
+	if runtime.GOOS == "windows" {
+		if len(remote.Services) > 0 {
+			list = append(list, &collectors.WindowsService{Units: remote.Services})
 		}
-		list = append(list, &collectors.Logs{Units: units})
+		if len(remote.IISAppPools) > 0 {
+			list = append(list, &collectors.IIS{AppPools: remote.IISAppPools})
+		}
+	} else {
+		if len(remote.Services) > 0 {
+			list = append(list, &collectors.Systemd{Units: remote.Services})
+		}
+		if len(remote.LogUnits) > 0 {
+			var units []collectors.LogUnit
+			for _, unit := range remote.LogUnits {
+				units = append(units, collectors.LogUnit{Unit: unit.Unit, MaxLines: unit.MaxLines})
+			}
+			list = append(list, &collectors.Logs{Units: units})
+		}
 	}
 	return list
 }

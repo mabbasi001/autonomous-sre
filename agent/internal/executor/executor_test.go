@@ -135,6 +135,22 @@ func TestDefaultRunnerEnforcesContextDeadline(t *testing.T) {
 	}
 }
 
+func TestNonAllowlistedPoolRejectedBeforePlatformCheck(t *testing.T) {
+	e, calls := newTestExecutor(t)
+	e.SetAllowedAppPools([]string{"DefaultAppPool"})
+	result := e.Handle(Command{
+		ID:     "c1",
+		Action: "iis.recycle_app_pool",
+		Params: map[string]any{"pool": "EvilPool"},
+	})
+	if result.Status != "rejected" || !strings.Contains(result.Error, "allowlist") {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(*calls) != 0 {
+		t.Error("nothing may run for a non-allowlisted pool")
+	}
+}
+
 func TestOutputBounded(t *testing.T) {
 	e, _ := newTestExecutor(t, "nginx")
 	e.Run = func(ctx context.Context, name string, args ...string) ([]byte, int, error) {

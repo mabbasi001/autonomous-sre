@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -43,18 +42,20 @@ type Executor struct {
 	Timeout time.Duration
 	Run     func(ctx context.Context, name string, args ...string) ([]byte, int, error)
 
-	mu       sync.Mutex
-	stateDir string
-	allowed  map[string]bool
-	executed map[string]bool
-	order    []string
+	mu           sync.Mutex
+	stateDir     string
+	allowed      map[string]bool
+	allowedPools map[string]bool
+	executed     map[string]bool
+	order        []string
 }
 
 func New(stateDir string, allowedServices []string) (*Executor, error) {
 	e := &Executor{
-		Timeout:  defaultTimeout,
-		stateDir: stateDir,
-		executed: map[string]bool{},
+		Timeout:      defaultTimeout,
+		stateDir:     stateDir,
+		allowedPools: map[string]bool{},
+		executed:     map[string]bool{},
 	}
 	e.SetAllowedServices(allowedServices)
 
@@ -88,10 +89,26 @@ func (e *Executor) SetAllowedServices(services []string) {
 	e.mu.Unlock()
 }
 
+func (e *Executor) SetAllowedAppPools(pools []string) {
+	allowed := make(map[string]bool, len(pools))
+	for _, pool := range pools {
+		allowed[pool] = true
+	}
+	e.mu.Lock()
+	e.allowedPools = allowed
+	e.mu.Unlock()
+}
+
 func (e *Executor) serviceAllowed(unit string) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.allowed[unit]
+}
+
+func (e *Executor) poolAllowed(pool string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.allowedPools[pool]
 }
 
 // markExecuted persists the ID before anything runs, so a crash between
@@ -143,20 +160,25 @@ func (e *Executor) Handle(cmd Command) Result {
 func (e *Executor) dispatch(cmd Command) Result {
 	switch cmd.Action {
 	case "service.restart":
-		return e.serviceCommand(cmd, "sudo", "-n", "systemctl", "restart")
+		return e.serviceAction(cmd, restartCommand, nil)
 	case "service.status":
-		return e.serviceCommand(cmd, "systemctl", "show", "--no-pager",
-			"--property=ActiveState,SubState,NRestarts")
+		return e.serviceAction(cmd, statusCommand, normalizeStatus)
 	case "logs.collect_excerpt":
 		return e.collectLogs(cmd)
 	case "http.check":
 		return e.httpCheck(cmd)
+	case "iis.recycle_app_pool":
+		return e.recyclePool(cmd)
 	default:
 		return Result{Status: "rejected", Error: "unknown action: " + cmd.Action}
 	}
 }
 
-func (e *Executor) serviceCommand(cmd Command, name string, args ...string) Result {
+func (e *Executor) serviceAction(
+	cmd Command,
+	build func(string) (string, []string),
+	normalize func(string) string,
+) Result {
 	unit, ok := cmd.Params["unit"].(string)
 	if !ok || unit == "" {
 		return Result{Status: "rejected", Error: "missing unit parameter"}
@@ -164,7 +186,27 @@ func (e *Executor) serviceCommand(cmd Command, name string, args ...string) Resu
 	if !e.serviceAllowed(unit) {
 		return Result{Status: "rejected", Error: "unit not in local allowlist: " + unit}
 	}
-	return e.run(name, append(args, unit)...)
+	name, args := build(unit)
+	result := e.run(name, args...)
+	if normalize != nil && result.Output != "" {
+		result.Output = normalize(result.Output)
+	}
+	return result
+}
+
+func (e *Executor) recyclePool(cmd Command) Result {
+	pool, ok := cmd.Params["pool"].(string)
+	if !ok || pool == "" {
+		return Result{Status: "rejected", Error: "missing pool parameter"}
+	}
+	if !e.poolAllowed(pool) {
+		return Result{Status: "rejected", Error: "app pool not in local allowlist: " + pool}
+	}
+	name, args, supported := recycleCommand(pool)
+	if !supported {
+		return Result{Status: "rejected", Error: "iis.recycle_app_pool not supported on this host"}
+	}
+	return e.run(name, args...)
 }
 
 func (e *Executor) collectLogs(cmd Command) Result {
@@ -176,7 +218,8 @@ func (e *Executor) collectLogs(cmd Command) Result {
 	if n, ok := cmd.Params["max_lines"].(float64); ok && n > 0 && n <= 200 {
 		maxLines = int(n)
 	}
-	return e.run("journalctl", "-u", unit, "-n", strconv.Itoa(maxLines), "--no-pager", "-o", "cat")
+	name, args := logsCommand(unit, maxLines)
+	return e.run(name, args...)
 }
 
 func (e *Executor) httpCheck(cmd Command) Result {

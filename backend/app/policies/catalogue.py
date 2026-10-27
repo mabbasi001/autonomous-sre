@@ -11,6 +11,7 @@ CATALOGUE = {
     "http.check": {"risk": READ_ONLY},
     "logs.collect_excerpt": {"risk": READ_ONLY},
     "service.restart": {"risk": LOW},
+    "iis.recycle_app_pool": {"risk": LOW},
 }
 
 

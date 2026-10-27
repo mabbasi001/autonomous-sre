@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ProposedAction(BaseModel):
     action: str
     unit: str | None = None
+    pool: str | None = None
     url: str | None = None
     name: str | None = None
     max_lines: int | None = None
