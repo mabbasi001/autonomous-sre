@@ -1,0 +1,8 @@
+{
+  "collect_interval_seconds": 15,
+  "services": ["W3SVC"],
+  "iis_app_pools": ["DefaultAppPool"],
+  "http_checks": [
+    { "name": "site", "url": "http://localhost/", "timeout_seconds": 3 }
+  ]
+}

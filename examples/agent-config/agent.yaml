@@ -1,0 +1,5 @@
+# Local agent config. The control plane owns collection config (which
+# services/checks to watch) and delivers it after enrollment.
+control_plane_url: https://sre.internal.example:8443
+environment: development
+state_dir: /var/lib/autonomous-sre
