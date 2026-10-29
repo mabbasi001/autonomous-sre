@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     oidc_tenant_id: str = ""
     oidc_client_id: str = ""
     oidc_jwks: str = ""  # inline JWKS JSON; when empty the tenant's JWKS endpoint is fetched
+    auth_secret: str = ""  # HS256 key for local-account session tokens (interim, pre-Entra)
+    session_ttl_seconds: int = 43200  # 12h local-login session lifetime
     approval_ttl_seconds: int = 900
     command_expiry_seconds: int = 120
     anthropic_api_key: str = Field(

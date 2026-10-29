@@ -10,6 +10,7 @@ from app.api import (
     alert_rules,
     approvals,
     audit,
+    auth,
     incidents,
     ingestion,
     inventory,
@@ -62,6 +63,7 @@ def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+app.include_router(auth.router)
 app.include_router(agents.router)
 app.include_router(ingestion.router)
 app.include_router(alert_rules.router)

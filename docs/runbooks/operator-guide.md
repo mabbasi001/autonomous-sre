@@ -9,6 +9,21 @@
 | approver | + approve/reject remediation (never your own request) |
 | admin | + manage policies, alert rules, kill switches, agents |
 
+## Signing in & accounts
+
+Operator auth runs in one of two modes. Interim mode is **local
+accounts**: sign in with email + password at the dashboard's `/login`.
+An admin manages accounts from the control plane:
+
+```bash
+python -m app.cli create-user --email alice@example.com --role operator
+python -m app.cli set-password --email alice@example.com
+```
+
+Each account has a distinct identity, so **requester ≠ approver** holds —
+approvals need a second account. The eventual mode is Entra ID OIDC
+(set `SRE_OIDC_*`); it takes precedence and disables local login.
+
 ## Daily
 
 - Watch the **Incidents** page. Each incident shows its AI diagnosis,
