@@ -1,12 +1,22 @@
-"""Operator authentication (Entra ID OIDC bearer tokens) and RBAC.
+"""Operator authentication and RBAC.
 
-Roles come from the app registration's `roles` claim. When OIDC is not
-configured, development falls back to a synthetic admin so the API stays
-usable before the tenant exists; any other environment refuses.
+Two interchangeable modes, selected by config (checked in this order):
+
+1. **Entra ID OIDC** — when ``oidc_tenant_id`` is set, bearer tokens are
+   Entra RS256 tokens validated against the tenant JWKS; roles come from
+   the ``roles`` claim.
+2. **Local accounts** — when ``auth_secret`` is set (and OIDC is not),
+   bearer tokens are backend-signed HS256 session tokens minted by
+   ``/v1/auth/login``; the role is read live from the DB user, never the
+   token, so a role change takes effect immediately.
+
+With neither configured, development falls back to a synthetic admin so
+the API stays usable before auth is wired; any other environment refuses.
 """
 
 import json
 import logging
+import time
 
 import httpx
 import jwt
@@ -24,6 +34,36 @@ logger = logging.getLogger("auth")
 ROLE_ORDER = ["viewer", "operator", "approver", "admin"]
 
 _jwks_cache: dict | None = None
+
+
+def issue_session(user: User) -> tuple[str, int]:
+    """Mint a local session token for a logged-in local account.
+
+    Returns (token, expires_in_seconds). Carries only the identity; the
+    role is resolved from the DB on each request, not trusted from here.
+    """
+    ttl = settings.session_ttl_seconds
+    claims = {
+        "typ": "session",
+        "sub": user.email,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + ttl,
+    }
+    return jwt.encode(claims, settings.auth_secret, algorithm="HS256"), ttl
+
+
+def _user_from_session(token: str, db: Session) -> User:
+    try:
+        claims = jwt.decode(token, settings.auth_secret, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="invalid token") from None
+    if claims.get("typ") != "session":
+        raise HTTPException(status_code=401, detail="invalid token")
+    user = db.scalar(select(User).where(User.email == claims.get("sub")))
+    if user is None or user.password_hash is None:
+        # Account removed or converted away from local auth → session is void.
+        raise HTTPException(status_code=401, detail="account not found")
+    return user
 
 
 def _jwks() -> dict:
@@ -64,6 +104,10 @@ async def current_user(
     db: Session = Depends(get_db),
 ) -> User:
     if not settings.oidc_tenant_id:
+        if settings.auth_secret:
+            if not authorization or not authorization.startswith("Bearer "):
+                raise HTTPException(status_code=401, detail="missing bearer token")
+            return _user_from_session(authorization.removeprefix("Bearer "), db)
         if settings.environment == "development":
             return _dev_admin(db)
         raise HTTPException(status_code=401, detail="operator auth not configured")

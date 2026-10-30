@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMe } from "../lib/hooks";
 
 const LINKS = [
@@ -13,7 +13,18 @@ const LINKS = [
 
 export function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
   const me = useMe();
+
+  // The login page has no nav.
+  if (pathname === "/login") return null;
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
+
   return (
     <nav className="nav">
       <span className="brand">Autonomous SRE</span>
@@ -32,6 +43,9 @@ export function Nav() {
           {me.email} · <span className="role">{me.role}</span>
         </span>
       )}
+      <button type="button" className="signout" onClick={signOut}>
+        Sign out
+      </button>
     </nav>
   );
 }

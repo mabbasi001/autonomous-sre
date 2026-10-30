@@ -40,6 +40,8 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="viewer")
+    # Set only for local accounts (interim auth). Entra-provisioned users stay null.
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class Agent(Base, TimestampMixin):

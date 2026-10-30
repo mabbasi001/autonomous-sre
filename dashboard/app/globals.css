@@ -290,3 +290,53 @@ textarea {
 .pill-link {
   font-weight: 600;
 }
+
+.nav .signout {
+  margin-left: 12px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.login {
+  max-width: 340px;
+  margin: 10vh auto 0;
+  padding: 28px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.login h1 {
+  font-size: 20px;
+  margin: 0;
+}
+.login .muted {
+  color: var(--muted);
+  margin: 4px 0 20px;
+}
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.login label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.login input {
+  padding: 9px 11px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+.login button {
+  margin-top: 4px;
+}
+.login .error {
+  color: #b4231a;
+  font-size: 13px;
+  margin: 0;
+}

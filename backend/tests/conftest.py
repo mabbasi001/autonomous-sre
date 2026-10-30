@@ -53,6 +53,7 @@ settings.oidc_client_id = TEST_CLIENT_ID
 settings.oidc_jwks = json.dumps(TEST_JWKS)
 settings.slack_webhook_url = ""  # a developer's .env must not leak into tests
 settings.anthropic_api_key = ""
+settings.auth_secret = ""  # tests run in OIDC mode; local-auth stays off unless a test opts in
 
 
 def operator_token(
