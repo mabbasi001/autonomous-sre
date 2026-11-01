@@ -25,6 +25,11 @@ services:
       SRE_DATABASE_URL: postgresql+psycopg://sre_app:sre_app@postgres:5432/sre
       SRE_MIGRATION_DATABASE_URL: postgresql+psycopg://sre:sre@postgres:5432/sre
       SRE_ENVIRONMENT: development
+      # Local-account login: OIDC off, local auth on. The signing key is a
+      # local-dev default; override with SRE_AUTH_SECRET in the environment
+      # (or deploy/compose/.env) for anything real.
+      SRE_OIDC_TENANT_ID: ""
+      SRE_AUTH_SECRET: ${SRE_AUTH_SECRET:-local-dev-only-session-signing-key-change-me}
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
