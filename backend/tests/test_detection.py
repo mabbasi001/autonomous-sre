@@ -17,10 +17,10 @@ def sim(client, db):
     return agent
 
 
-def service_state(state: str) -> dict:
+def service_state(state: str, unit: str = "nginx") -> dict:
     return {
         "type": "systemd.service",
-        "payload": {"unit": "nginx", "active_state": state, "sub_state": "dead", "restarts": 0},
+        "payload": {"unit": unit, "active_state": state, "sub_state": "dead", "restarts": 0},
     }
 
 
@@ -35,7 +35,7 @@ def test_service_inactive_fires_exactly_one_alert(sim, db):
     sim.send("/v1/events", [service_state("inactive")])
     process_pending_events(db)
 
-    fired = alerts(db, "nginx-service-down")
+    fired = alerts(db, "systemd-service-down")
     assert len(fired) == 1
     assert fired[0].status == "firing"
     assert fired[0].fingerprint == f"systemd:nginx:{sim.agent_id}"
@@ -43,7 +43,7 @@ def test_service_inactive_fires_exactly_one_alert(sim, db):
     # condition persists: repeated inactive reports are not new transitions
     sim.send("/v1/events", [service_state("inactive")])
     process_pending_events(db)
-    assert len(alerts(db, "nginx-service-down")) == 1
+    assert len(alerts(db, "systemd-service-down")) == 1
 
 
 def test_recovery_resolves_alert(sim, db):
@@ -52,17 +52,42 @@ def test_recovery_resolves_alert(sim, db):
     sim.send("/v1/events", [service_state("active")])
     process_pending_events(db)
 
-    fired = alerts(db, "nginx-service-down")
+    fired = alerts(db, "systemd-service-down")
     assert len(fired) == 1
     assert fired[0].status == "resolved"
     assert fired[0].resolved_at is not None
+
+
+def test_any_service_fires_not_just_nginx(sim, db):
+    # The rule is generic: a non-nginx unit going down must fire too.
+    sim.send("/v1/events", [service_state("failed", unit="postgresql")])
+    process_pending_events(db)
+
+    fired = alerts(db, "systemd-service-down")
+    assert len(fired) == 1
+    assert fired[0].fingerprint == f"systemd:postgresql:{sim.agent_id}"
+
+
+def test_distinct_units_are_independent_alerts(sim, db):
+    sim.send(
+        "/v1/events",
+        [service_state("inactive", unit="redis"), service_state("failed", unit="cron")],
+    )
+    process_pending_events(db)
+
+    fired = alerts(db, "systemd-service-down")
+    fingerprints = {a.fingerprint for a in fired}
+    assert fingerprints == {
+        f"systemd:redis:{sim.agent_id}",
+        f"systemd:cron:{sim.agent_id}",
+    }
 
 
 def test_nginx_down_scenario_fires_service_and_http_rules(sim, db):
     sim.replay("nginx_down")
     process_pending_events(db)
 
-    assert len(alerts(db, "nginx-service-down")) == 1
+    assert len(alerts(db, "systemd-service-down")) == 1
     assert len(alerts(db, "http-check-failing")) == 1
     assert all(a.status == "firing" for a in alerts(db))
 
@@ -132,14 +157,14 @@ def test_replayed_event_does_not_duplicate_alert(sim, db):
     process_pending_events(db)
     process_pending_events(db)  # reprocessing the queue is also a no-op
 
-    assert len(alerts(db, "nginx-service-down")) == 1
+    assert len(alerts(db, "systemd-service-down")) == 1
 
 
 def test_alert_records_version_and_evidence(sim, db):
     sim.send("/v1/events", [service_state("failed")])
     process_pending_events(db)
 
-    alert = alerts(db, "nginx-service-down")[0]
+    alert = alerts(db, "systemd-service-down")[0]
     assert alert.rule_version == 1
     event = db.scalar(select(Event).where(Event.type == "systemd.service"))
     assert alert.event_ids == [str(event.id)]
@@ -149,19 +174,17 @@ def test_alert_records_version_and_evidence(sim, db):
 def test_rule_edit_versions_and_old_alerts_keep_theirs(sim, db, client):
     sim.send("/v1/events", [service_state("inactive")])
     process_pending_events(db)
-    old_alert = alerts(db, "nginx-service-down")[0]
+    old_alert = alerts(db, "systemd-service-down")[0]
     assert old_alert.rule_version == 1
 
     resp = client.post(
         "/v1/alert-rules",
         json={
-            "name": "nginx-service-down",
+            "name": "systemd-service-down",
             "rule_type": "state_change",
             "severity": "high",
             "condition": {
-                "event_type": "systemd.service",
-                "match": {"unit": "nginx"},
-                "identity_fields": ["unit"],
+                "event_type": "systemd.service",                "identity_fields": ["unit"],
                 "field": "active_state",
                 "bad_values": ["inactive", "failed"],
             },
@@ -173,7 +196,7 @@ def test_rule_edit_versions_and_old_alerts_keep_theirs(sim, db, client):
 
     listed = client.get("/v1/alert-rules").json()["rules"]
     by_name = {r["name"]: r for r in listed}
-    assert by_name["nginx-service-down"]["version"] == 2
+    assert by_name["systemd-service-down"]["version"] == 2
 
     db.refresh(old_alert)
     assert old_alert.rule_version == 1
