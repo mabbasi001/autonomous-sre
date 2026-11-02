@@ -1,0 +1,12 @@
+{
+  "collect_interval_seconds": 15,
+  "services": ["nginx", "postgresql", "ssh", "cron"],
+  "http_checks": [
+    { "name": "web", "url": "http://localhost/", "timeout_seconds": 3 },
+    { "name": "api", "url": "http://localhost:8080/health", "timeout_seconds": 3 }
+  ],
+  "log_units": [
+    { "unit": "nginx", "max_lines": 50 },
+    { "unit": "postgresql", "max_lines": 50 }
+  ]
+}

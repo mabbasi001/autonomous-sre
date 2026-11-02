@@ -41,7 +41,7 @@ def test_service_down_opens_single_incident(sim, db):
     assert len(found) == 1
     assert found[0].status == "OPEN"
     assert found[0].fingerprint == f"systemd:nginx:{sim.agent_id}"
-    assert "nginx-service-down" in found[0].title
+    assert "systemd-service-down" in found[0].title
 
     sim.send("/v1/events", [service_state("inactive")])
     pipeline(db)
