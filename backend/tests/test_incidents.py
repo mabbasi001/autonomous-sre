@@ -6,7 +6,11 @@ from sqlalchemy import select
 from test_enrollment import make_token
 
 from app.detection.engine import process_pending_events
-from app.incidents.manager import process_new_alerts
+from app.incidents.manager import (
+    process_new_alerts,
+    resolve_self_healed_incidents,
+    transition,
+)
 from app.models import Alert, AuditLog, Incident, IncidentEvent
 
 
@@ -46,6 +50,55 @@ def test_service_down_opens_single_incident(sim, db):
     sim.send("/v1/events", [service_state("inactive")])
     pipeline(db)
     assert len(incidents(db)) == 1
+
+
+def test_self_healed_incident_auto_resolves(sim, db):
+    sim.send("/v1/events", [service_state("inactive")])
+    pipeline(db)
+    incident = incidents(db)[0]
+    assert incident.status == "OPEN"
+
+    # service comes back on its own -> alert resolves
+    sim.send("/v1/events", [service_state("active")])
+    pipeline(db)
+    assert resolve_self_healed_incidents(db) == 1
+
+    db.refresh(incident)
+    assert incident.status == "RESOLVED"
+    assert incident.closed_at is not None
+    row = db.scalar(
+        select(AuditLog)
+        .where(AuditLog.event_type == "incident.transition")
+        .order_by(AuditLog.created_at.desc())
+    )
+    assert row.detail["to"] == "RESOLVED"
+    assert "self-recovered" in row.detail["reason"]
+
+
+def test_still_firing_incident_not_resolved(sim, db):
+    sim.send("/v1/events", [service_state("inactive")])
+    pipeline(db)
+    # alert still firing -> nothing to self-heal
+    assert resolve_self_healed_incidents(db) == 0
+    assert incidents(db)[0].status == "OPEN"
+
+
+def test_remediation_in_progress_not_self_resolved(sim, db):
+    sim.send("/v1/events", [service_state("inactive")])
+    pipeline(db)
+    incident = incidents(db)[0]
+    # drive it into a remediation state
+    transition(db, incident, "INVESTIGATING", actor_type="system", reason="t")
+    transition(db, incident, "MANUAL_TRIAGE", actor_type="system", reason="t")
+    transition(db, incident, "REMEDIATION_PROPOSED", actor_type="user", reason="t")
+    db.commit()
+
+    # even though the alert now resolves, self-heal must not touch it
+    sim.send("/v1/events", [service_state("active")])
+    pipeline(db)
+    assert resolve_self_healed_incidents(db) == 0
+    db.refresh(incident)
+    assert incident.status == "REMEDIATION_PROPOSED"
 
 
 def test_flapping_one_incident_many_events(sim, db):
