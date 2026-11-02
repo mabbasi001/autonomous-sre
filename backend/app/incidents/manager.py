@@ -12,16 +12,22 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.audit import record
+from app.config import settings
 from app.models import Agent, Alert, Environment, Event, Incident, IncidentEvent, IncidentEvidence
 from app.notifications.service import notify
 
 TERMINAL_STATUSES = {"RESOLVED", "CLOSED"}
 
+# States from which a self-recovered incident may auto-resolve: opened but
+# with no remediation underway. Everything from REMEDIATION_PROPOSED onward is
+# left to the verification path or a human.
+SELF_HEAL_STATES = {"OPEN", "INVESTIGATING", "MANUAL_TRIAGE"}
+
 TRANSITIONS = {
-    "OPEN": {"INVESTIGATING", "CLOSED"},
-    "INVESTIGATING": {"DIAGNOSED", "MANUAL_TRIAGE"},
+    "OPEN": {"INVESTIGATING", "CLOSED", "RESOLVED"},
+    "INVESTIGATING": {"DIAGNOSED", "MANUAL_TRIAGE", "RESOLVED"},
     "DIAGNOSED": {"REMEDIATION_PROPOSED"},
-    "MANUAL_TRIAGE": {"REMEDIATION_PROPOSED", "INVESTIGATING"},
+    "MANUAL_TRIAGE": {"REMEDIATION_PROPOSED", "INVESTIGATING", "RESOLVED"},
     "REMEDIATION_PROPOSED": {"EXECUTING", "AWAITING_APPROVAL", "ESCALATED"},
     "AWAITING_APPROVAL": {"EXECUTING", "ESCALATED"},
     "EXECUTING": {"VERIFYING", "ESCALATED"},
@@ -182,3 +188,36 @@ def transition(
     if to_status == "ESCALATED":
         notify_incident(db, "incident.escalated", incident)
     return incident
+
+
+def resolve_self_healed_incidents(db: Session) -> int:
+    """Auto-close incidents whose triggering alert(s) all resolved on their
+    own, with no remediation taken — the service came back by itself.
+
+    Gated to SELF_HEAL_STATES: anything with remediation underway is left to
+    the verification path, and ESCALATED is left for a human. Requires at
+    least one attached alert, all resolved (positive recovery evidence) —
+    this never resolves on absence of evidence.
+    """
+    if not settings.auto_resolve_self_healed:
+        return 0
+    incidents = db.scalars(
+        select(Incident).where(Incident.status.in_(SELF_HEAL_STATES))
+    ).all()
+    resolved = 0
+    for incident in incidents:
+        alerts = db.scalars(select(Alert).where(Alert.incident_id == incident.id)).all()
+        if not alerts or any(a.status != "resolved" for a in alerts):
+            continue
+        transition(
+            db,
+            incident,
+            "RESOLVED",
+            actor_type="system",
+            reason="self-recovered: triggering alert(s) resolved with no remediation",
+        )
+        notify_incident(db, "incident.resolved", incident)
+        resolved += 1
+    if resolved:
+        db.commit()
+    return resolved

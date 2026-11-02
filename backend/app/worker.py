@@ -6,7 +6,7 @@ from app.commands.service import expire_commands
 from app.config import settings
 from app.db import SessionLocal
 from app.detection.engine import absence_sweep, process_pending_events
-from app.incidents.manager import process_new_alerts
+from app.incidents.manager import process_new_alerts, resolve_self_healed_incidents
 from app.investigation.service import investigate_open_incidents
 from app.logging import setup_logging
 from app.notifications.service import deliver_pending
@@ -27,6 +27,7 @@ def tick() -> tuple[int, int]:
         expire_pending(db)
         expire_commands(db)
         run_verifications(db)
+        resolve_self_healed_incidents(db)
         deliver_pending(db)
     return fired, opened
 

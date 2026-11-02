@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     ai_token_budget: int = 20000
     verify_settle_seconds: int = 10
     verify_max_attempts: int = 2
+    # Auto-close an incident when its triggering alert(s) resolve on their
+    # own and no remediation was taken ("self-recovered"). Positive recovery
+    # evidence only — never resolves on absence of evidence.
+    auto_resolve_self_healed: bool = True
 
 
 settings = Settings()
